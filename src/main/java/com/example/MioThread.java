@@ -36,26 +36,35 @@ public class MioThread extends Thread{  //estensione della classe Thread
         String line = "";   
         try {
             line = in.readLine();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            int numero = Integer.parseInt(line); 
+
+            if(numero == n){
+                out.println("Hai vinto!");
+            }
+            else{
+                out.println("Hai perso!");
+            }
+        } catch (IOException e) {   //gestione eccezioni
+            System.err.println("Errore nella comunicazione con il client: " + e.getMessage());
+            e.printStackTrace();    
+        } finally { // Chiusura delle risorse - si esegue SEMPRE
+            
+            try {
+                System.out.println("Chiusura connessione con il client...");
+                
+                if (scanner != null) scanner.close();  //chiude lo scanner controllando che non sia null
+                if (in != null) in.close();  //chiude il buffer di input controllando che non sia null
+                if (out != null) out.close();  //chiude il buffer di output controllando che non sia null
+                if (socket != null && !socket.isClosed()) socket.close();  //chiude la socket controllando che non sia null e che non sia già chiusa
+                
+                System.out.println("Connessione chiusa con successo!");
+            } catch (IOException e) {   //gestione eccezioni durante la chiusura
+                System.err.println("Errore nella chiusura della connessione: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
-        
-        int numero = Integer.parseInt(line); 
-
-        if(numero == n){
-
-            out.println("Hai vinto!");
-        }
-        else{
-
-            out.println("Hai perso!");
-        }
-
-        scanner.close();
-
     }
     
-    }
+}
 
 
