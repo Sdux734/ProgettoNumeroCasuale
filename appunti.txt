@@ -350,11 +350,193 @@ i dati verso la giusta Socket in base alla TUPLA COMPLETA
 
 
 ================================================================================
+GESTIONE DELLA SCELTA DEL RANGE CON DO-WHILE
+================================================================================
+
+Il client deve scegliere il range (0-10, 0-100, 0-1000). Usa un do-while per 
+ripetere la richiesta finché non fa una scelta valida:
+
+    int r = 0; 
+    boolean b = false;
+
+    // Do-while con try-catch DENTRO per gestire input non validi
+    do {
+        try {
+            out.println("scegli il range con cui giocare:");
+            out.println("1. 0-10");
+            out.println("2. 0-100");
+            out.println("3. 0-1000");
+
+            line = in.readLine();  // Legge la scelta del client
+            int numero = Integer.parseInt(line);  // Converte a numero
+
+            if(numero == 1){
+                r = 11;  // Range per 0-10
+                out.println("Scegli un numero tra 0-10!"); 
+                b = true;  // Scelta valida, esce dal ciclo
+            } 
+            else if(numero == 2){
+                r = 101;  // Range per 0-100
+                out.println("Scegli un numero tra 0-100!"); 
+                b = true;
+            } 
+            else if(numero == 3){
+                r = 1001;  // Range per 0-1000
+                out.println("Scegli un numero tra 0-1000!"); 
+                b = true;
+            }
+            else {
+                out.println("Scelta non valida! Riprova.");
+                // b rimane false, il ciclo riprova
+            }
+            
+        } catch (NumberFormatException e) {
+            // Se il client invia un valore non numerico
+            out.println("Errore! Inserisci un numero valido (1, 2 o 3).");
+            // b rimane false, il ciclo riprova
+        } catch (IOException e) {
+            System.err.println("Errore nella comunicazione: " + e.getMessage());
+            e.printStackTrace();
+            break;  // Errore critico, esce dal ciclo
+        }
+    } while(!b);  // Ripete finché b è false (scelta non valida)
+
+KEY POINTS:
+- b = true → scelta valida, esce dal ciclo
+- b rimane false → scelta non valida, riprova
+- NumberFormatException → input non numerico, riprova
+- IOException → errore di rete critico, break e termina
+
+
+================================================================================
+GESTIONE DELLA SCELTA DEL NUMERO CON DO-WHILE
+================================================================================
+
+Dopo aver generato il numero casuale, il client lo deve indovinare. 
+Usa un do-while per permettere al client di riprovare se inserisce input non valido:
+
+    Random rand = new Random();
+    int n = rand.nextInt(r);  // Genera numero in base al range
+    System.out.println(n);
+
+    boolean numeroValido = false;
+    do {
+        try {
+            line = in.readLine();  // Legge il tentativo del client
+            int numero = Integer.parseInt(line);  // Converte a numero
+
+            if(numero == n){
+                out.println("Hai vinto!");
+            }
+            else{
+                out.println("Hai perso!");
+            }
+            numeroValido = true;  // Input valido, esce dal ciclo
+            
+        } catch (NumberFormatException e) {
+            // Se il client invia un valore non numerico
+            out.println("Errore! Inserisci un NUMERO valido.");
+            numeroValido = false;  // Riprova
+            
+        } catch (IOException e) {
+            System.err.println("Errore nella comunicazione: " + e.getMessage());
+            e.printStackTrace();
+            numeroValido = true;  // Errore critico, esce dal ciclo
+        }
+    } while(!numeroValido);  // Ripete finché non riceve un numero valido
+
+KEY POINTS:
+- numeroValido = true → numero valido ricevuto, esce dal ciclo
+- numeroValido = false → input non numerico, riprova
+- Il client può continuare a giocare finché non inserisce un numero valido
+
+
+================================================================================
+STRUTTURA CORRETTA: SEPARARE DO-WHILE DA FINALLY
+================================================================================
+
+IMPORTANTE: Se metti il do-while intorno al try-catch E hai un finally,
+il finally si eseguirebbe ad OGNI ITERAZIONE (chiudendo la connessione
+ogni volta). Questo è SBAGLIATO!
+
+SOLUZIONE: Separa il try-catch per la chiusura dal do-while:
+
+    // ===== CICLO DO-WHILE (per gestire riprovare l'input) =====
+    do {
+        try {
+            // logica del gioco
+        } catch (NumberFormatException e) {
+            // errore parsing
+        } catch (IOException e) {
+            // errore rete
+        }
+    } while(!condizioneEsci);  // ← CICLO CHIUDE QUI
+
+    // ===== TRY-CATCH SEPARATO (per la chiusura risorse) =====
+    // Si esegue UNA SOLA VOLTA dopo il ciclo
+    try {
+        // chiude scanner, in, out, socket
+    } catch (IOException e) {
+        // errore durante chiusura
+    }
+
+DIAGRAMMA:
+
+    ┌─────────────────────────┐
+    │  do {                   │
+    │    try {                │
+    │      logica gioco       │
+    │    } catch (...) { }    │
+    │  } while(!condizioneEsci) ← CICLO TERMINA
+    └─────────────────────────┘
+              ↓
+    ┌─────────────────────────┐
+    │  try {                  │
+    │    chiude risorse       │ ← Si esegue UNA SOLA VOLTA
+    │  } catch (...) { }      │
+    └─────────────────────────┘
+
+VANTAGGI:
+✅ Il client può riprovare infinite volte
+✅ La chiusura avviene una sola volta alla fine
+✅ Separazione di responsabilità (logica vs. pulizia)
+
+
+================================================================================
+GESTIONE ERRORI: DIFFERENZA TRA NUMBERFORMATEXCEPTION E IOEXCEPTION
+================================================================================
+
+NumberFormatException:
+- QUANDO: Integer.parseInt() riceve una stringa non numerica
+- ESEMPIO: Client invia "abc" invece di "42"
+- AZIONE: Inviare messaggio di errore, riprovare
+- VALORE b/numeroValido: Rimane false (riprova il ciclo)
+
+IOException:
+- QUANDO: Problema di comunicazione di rete (client disconnesso, errore socket)
+- ESEMPIO: Client chiude browser, problema connessione
+- AZIONE: Log errore e termina il gioco
+- VALORE b/numeroValido: Imposta a true (esce dal ciclo) o break
+
+Struttura corretta:
+    try {
+        line = in.readLine();  // ← Potrebbe lanciare IOException
+        int numero = Integer.parseInt(line);  // ← Potrebbe lanciare NumberFormatException
+    } catch (NumberFormatException e) {
+        // Input non valido, riprova
+    } catch (IOException e) {
+        // Problema di rete, termina
+    }
+
+
+================================================================================
 CONSIGLIO FINALE
 ================================================================================
 
-✅ Usa la SOLUZIONE 1 se è la prima volta
-✅ Considera la SOLUZIONE 2 per applicazioni con molti client
-✅ Aggiungi sempre il try-finally per la chiusura delle risorse (SOLUZIONE 3)
+✅ Usa la SOLUZIONE 1 (Loop infinito) per gestire multipli client
+✅ Usa do-while per OGNI input che il client deve dare
+✅ Separa il do-while dal try-catch di chiusura risorse
+✅ Gestisci NumberFormatException e IOException separatamente
+✅ Ricorda: try-catch di chiusura si esegue UNA SOLA VOLTA alla fine
 
 ================================================================================

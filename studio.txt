@@ -1,0 +1,849 @@
+================================================================================
+ANALISI DEGLI ERRORI COMUNI - GUIDA DISCORSIVA
+================================================================================
+
+In questo file analizziamo gli errori che hai commesso durante lo sviluppo
+del programma, perché dovevano essere corretti, e come correggerli.
+
+
+================================================================================
+PARTE 1: FONDAMENTI - TRY-CATCH SPIEGATO APPROFONDITAMENTE
+================================================================================
+
+COS'È UN'ECCEZIONE?
+Un'eccezione è un EVENTO ANORMALE che accade durante l'esecuzione del programma.
+Invece di bloccare completamente il programma, Java permette di "catturare"
+l'eccezione e gestirla appropriatamente.
+
+ESEMPI DI ECCEZIONI:
+- Divisione per zero: 5 / 0 → ArithmeticException
+- Convertire una stringa non numerica: Integer.parseInt("abc") → NumberFormatException
+- Accedere a un array fuori limite: array[100] con array di 10 elementi → IndexOutOfBoundsException
+- Problemi di rete: socket chiusa → IOException
+- Accedere a null: obj.metodo() dove obj è null → NullPointerException
+
+COSA SUCCEDE SENZA TRY-CATCH?
+Se il codice genera un'eccezione e NON la catturi, il programma MUORE sul posto:
+    int numero = Integer.parseInt("abc");  // Bum! Eccezione!
+    System.out.println("Questo non si stampa mai");  // ← Non raggiunto
+    
+Il programma termina e basta. Tutto il resto del codice non viene eseguito.
+
+COSA SUCCEDE CON TRY-CATCH?
+Con il try-catch CATTURI l'eccezione e decidi cosa fare:
+    try {
+        int numero = Integer.parseInt("abc");  // Bum! Eccezione!
+    } catch (NumberFormatException e) {
+        System.out.println("Input non valido, riprova");  // ← Gestisci l'errore
+    }
+    System.out.println("Il programma continua");  // ← Si esegue normalmente
+
+Il programma NON muore, ma continua a funzionare.
+
+
+STRUTTURA BASE DEL TRY-CATCH:
+
+    try {
+        // Codice che POTREBBE lanciare un'eccezione
+        // Se tutto va bene, questo blocco si esegue completamente
+    } 
+    catch (TipoEccezione e) {
+        // Questo blocco si esegue SOLO se viene lanciata TipoEccezione
+        // Qui gestisci l'errore
+    }
+    catch (AltroTipoEccezione e) {
+        // Puoi avere MULTIPLI catch per tipi diversi
+    }
+    finally {
+        // Questo blocco si esegue SEMPRE, indipendentemente da tutto
+        // È il momento ideale per la pulizia delle risorse
+    }
+
+FLUSSO DI ESECUZIONE:
+
+Scenario 1 - Nessun errore:
+    try { /* eseguito */ } 
+    catch { /* saltato */ } 
+    finally { /* eseguito */ }
+
+Scenario 2 - Eccezione catturata:
+    try { /* eseguito parzialmente */ } 
+    catch { /* eseguito */ } 
+    finally { /* eseguito */ }
+
+Scenario 3 - Eccezione non catturata:
+    try { /* eseguito parzialmente */ } 
+    catch { /* non corrisponde */ } 
+    finally { /* eseguito */ }
+    → PROGRAMMA MUORE
+
+
+QUANDO USARE TRY-CATCH:
+✓ Operazioni di I/O (lettura file, socket, database)
+✓ Conversioni di tipi (String a numero)
+✓ Accesso a array o liste
+✓ Operazioni matematiche potenzialmente pericolose
+✓ Qualsiasi codice che la documentazione dice "può lanciare eccezioni"
+
+QUANDO NON USARE TRY-CATCH:
+✗ Non usarlo per logica normale del programma (usa if-else invece)
+✗ Non imbacuccare tutto in un'unico grande try-catch generico
+✗ Non catturare eccezioni che non sai come gestire
+
+
+TIPO DI ECCEZIONI - QUALI CATTURARE?
+
+Ci sono due categorie principali:
+
+1. CHECKED EXCEPTIONS (controllate):
+   - DEVI catturarle obbligatoriamente
+   - Il compilatore ti forza a gestirle
+   - Esempio: IOException (problemi di rete/file)
+   
+   try {
+       line = in.readLine();  // readLine() lancia IOException
+   } catch (IOException e) {
+       // OBBLIGATORIO catturarla
+   }
+
+2. UNCHECKED EXCEPTIONS (non controllate):
+   - Non sei obbligato a catturarle
+   - Ma è CONSIGLIATO farlo
+   - Esempio: NumberFormatException, NullPointerException, IndexOutOfBoundsException
+   
+   try {
+       int numero = Integer.parseInt(line);  // Potrebbe lanciare NumberFormatException
+   } catch (NumberFormatException e) {
+       // Consigliato catturarla
+   }
+
+Nel tuo programma:
+- IOException è CHECKED → DEVI catturarla
+- NumberFormatException è UNCHECKED → consigliato catturarla
+
+
+ORDINE MULTIPLI CATCH:
+Se hai più catch, l'ordine IMPORTA! Metti prima le eccezioni più specifiche:
+
+    ✓ CORRETTO:
+    try { /* ... */ }
+    catch (NumberFormatException e) { }  // Più specifico
+    catch (IOException e) { }             // Più generico
+
+    ✗ SBAGLIATO:
+    try { /* ... */ }
+    catch (Exception e) { }       // Troppo generico, catturerebbe tutto
+    catch (NumberFormatException e) { }  // Questo non verrebbe mai raggiunto
+
+
+IL PARAMETRO 'e':
+    catch (NumberFormatException e) {
+        // 'e' è l'oggetto dell'eccezione
+        e.printStackTrace();  // Stampa la traccia completa
+        e.getMessage();      // Ottiene il messaggio di errore
+    }
+
+
+================================================================================
+PARTE 2: GESTIONE DELLE RISORSE - PERCHÉ IL TRY-CATCH DI CLEANUP?
+================================================================================
+
+COSA SONO LE RISORSE?
+Le risorse sono oggetti che occupano MEMORIA e CONNESSIONI ESTERNE:
+- Socket: connessione di rete aperta
+- FileInputStream/OutputStream: file aperti
+- BufferedReader/PrintWriter: stream di input/output
+- Database connections: connessioni a database
+- Scanner: oggetto che legge input
+
+Queste risorse sono FINITE. Un server può avere solo un numero limitato di
+connessioni contemporanee. Se non le chiudi, finisci le risorse disponibili.
+
+
+COSA SUCCEDE SE NON LE CHIUDI?
+Immagina un ristorante che apre tavoli ma non li chiude mai:
+
+    Customer 1 → Tavolo aperto → Non chiuso → Memoria occupata
+    Customer 2 → Tavolo aperto → Non chiuso → Memoria occupata
+    Customer 3 → Tavolo aperto → Non chiuso → Memoria occupata
+    ...
+    Customer 100 → NON CI SONO PIÙ TAVOLI LIBERI
+    
+Il ristorante non può servire altri clienti. I tavoli sono "occupati fantasma".
+
+Stesso concetto con le Socket:
+    Client 1 → Socket aperta → Non chiusa → Slot occupato
+    Client 2 → Socket aperta → Non chiusa → Slot occupato
+    Client 100 → Non ci sono più slot disponibili per Client 101!
+
+Questo si chiama MEMORY LEAK. Il server finisce i slot disponibili e nuovo
+client non possono connettersi.
+
+
+PERCHÉ IL TRY-CATCH SPECIFICO PER CLEANUP?
+
+Nel tuo codice:
+    try {
+        // logica del gioco
+    } catch (IOException e) {
+        // gestisci errore
+    } catch (NumberFormatException e) {
+        // gestisci errore
+    }
+    
+    // ===== QUESTO BLOCCO PER LA PULIZIA =====
+    try {
+        if (socket != null && !socket.isClosed()) socket.close();
+        if (in != null) in.close();
+        if (out != null) out.close();
+        if (scanner != null) scanner.close();
+    } catch (IOException e) {
+        System.err.println("Errore nella chiusura: " + e.getMessage());
+    }
+
+PERCHÉ È NECESSARIO?
+
+1. LA CHIUSURA STESSA PUÒ LANCIARE ECCEZIONI:
+   close() è una funzione che comunica con il sistema operativo e la rete.
+   Potrebbe generare IOException.
+   
+   Se non lo catturi, il programma muore prima di finire di chiudere tutto.
+
+2. DEVE ESEGUIRSI SEMPRE:
+   Anche se la chiusura del primo oggetto fallisce, devi comunque tentare
+   di chiudere gli altri. Per questo:
+   
+   ✗ SBAGLIATO:
+   try {
+       socket.close();    // Se fallisce, il resto non si esegue
+       in.close();
+       out.close();
+   } catch (IOException e) { }
+   
+   ✓ CORRETTO (multiple try-catch):
+   try {
+       socket.close();
+   } catch (IOException e) { }
+   try {
+       in.close();
+   } catch (IOException e) { }
+   try {
+       out.close();
+   } catch (IOException e) { }
+
+3. I CONTROLLI null PROTEGGONO IL PROGRAMMA:
+   if (socket != null && !socket.isClosed()) socket.close();
+   
+   Questi controlli significano:
+   - Se socket è null (non è mai stata creata), non tentare di chiuderla
+   - Se socket è già chiusa, non tentare di richiuderla
+   
+   Senza questi controlli, otteresti NullPointerException o altre eccezioni.
+
+
+COME LEGGERE IL CODICE:
+
+    try {
+        System.out.println("Inizio chiusura...");
+        
+        if (socket != null && !socket.isClosed())
+            socket.close();  // Chiude la socket (connessione di rete)
+        
+        if (in != null)
+            in.close();      // Chiude il canale di input
+        
+        if (out != null)
+            out.close();     // Chiude il canale di output
+        
+        if (scanner != null)
+            scanner.close(); // Chiude il lettore da tastiera
+        
+        System.out.println("Tutte le risorse chiuse!");
+        
+    } catch (IOException e) {
+        System.err.println("Errore: " + e.getMessage());
+        e.printStackTrace();
+    }
+
+Ogni oggetto ha un metodo close() che libera la risorsa. Se durante la
+chiusura c'è un problema di rete, IOException viene lanciato e gestito.
+
+
+QUANDO USARE IL FINALLY vs TRY-CATCH DI CLEANUP?
+
+FINALLY (vecchio stile):
+    try {
+        // logica
+    } catch (...) { }
+    finally {
+        // pulizia
+    }
+
+PRO:
+✓ Garantito che si esegue in tutte le circostanze
+✓ Parte della stessa struttura logica
+
+CONTRO:
+✗ Se la pulizia stessa fallisce, non è chiaro cosa succede
+✗ Il finally è stato usato per molto tempo, ma Java 7+ ha introdotto
+  "try-with-resources" per un approccio migliore
+
+TRY-CATCH SEPARATO (moderno):
+    try {
+        // logica
+    } catch (...) { }
+    
+    try {
+        // pulizia
+    } catch (IOException e) { }
+
+PRO:
+✓ Chiaro: hai due operazioni distinte con gestione degli errori
+✓ Più esplicito: è ovvio che la pulizia è una fase separata
+✓ Ogni catch ha il suo scopo
+
+CONTRO:
+✗ Richiede più righe di codice
+✗ Se dimentichi il secondo try-catch, la pulizia potrebbe non avvenire
+
+NEL TUO CASO:
+Usi il metodo moderno (try-catch separato), che è corretto e leggibile.
+
+
+================================================================================
+PARTE 3: MULTIPLI CLIENT - LOOP INFINITO IN MAIN
+================================================================================
+
+PROBLEMA: UN SOLO CLIENT
+Nella versione originale, il tuo Main.java era:
+    public static void main(String[] args) throws IOException {
+        ServerSocket ss = new ServerSocket(2000);
+        Socket s = ss.accept();
+        MioThread m = new MioThread(s);
+        m.start();
+        // ← FINE DEL PROGRAMMA! Il server muore!
+    }
+
+Questo accetta UN SOLO client, crea UN SOLO thread, e il programma termina.
+Se un secondo client prova a connettersi, ottiene "Connection refused".
+
+
+SOLUZIONE: LOOP INFINITO
+
+    ServerSocket ss = new ServerSocket(2000);
+    System.out.println("Server in ascolto sulla porta 2000...");
+    
+    while(true) {              // ← LOOP INFINITO
+        Socket s = ss.accept(); // Attende un client
+        System.out.println("Nuovo client connesso!");
+        
+        MioThread m = new MioThread(s);
+        m.start();              // Avvia il thread
+        // Torna al while e richiama accept()
+    }
+
+COSA SUCCEDE:
+
+1. accept() SI BLOCCA in attesa di un client
+   Il server non fa niente, aspetta pazientemente.
+
+2. CLIENTE ARRIVA
+   accept() restituisce una nuova Socket per quel client.
+
+3. CREA UN THREAD
+   new MioThread(s) crea un nuovo thread per gestire quel cliente specifico.
+
+4. AVVIA IL THREAD
+   m.start() lancia il thread in background (non aspetta che finisca).
+
+5. RITORNA AL WHILE
+   Il loop richiama accept() e si blocca di nuovo, aspettando il prossimo client.
+
+TIMELINE CON 2 CLIENT:
+
+    t=0s:   accept() bloccato, server in attesa...
+    t=2s:   Client A si connette
+            → accept() restituisce Socket_A
+            → Crea Thread_A
+            → m.start() lancia Thread_A
+            → Ritorna al while
+            → accept() bloccato di nuovo
+    
+    t=3s:   Client B si connette (mentre Thread_A continua a girare)
+            → accept() restituisce Socket_B
+            → Crea Thread_B
+            → m.start() lancia Thread_B
+            → Ritorna al while
+            → accept() bloccato di nuovo
+    
+    t=4s:   Thread_A finisce (client ha indovinato)
+            Server continua ad aspettare Client C
+    
+    t=5s:   Thread_B finisce (client ha indovinato)
+            Server continua ad aspettare Client D
+
+
+PERCHÉ FUNZIONA?
+
+accept() è BLOCCANTE ma RIPETIBILE. Ogni volta che si esegue, crea una
+connessione indipendente (una Socket). Anche se lo stesso accept() viene
+chiamato 1000 volte, ogni volta restituisce una Socket DIVERSA.
+
+È come dire: "Accetta clienti uno alla volta, ma ripeti all'infinito".
+
+Il fatto che ognuno di essi sia gestito da un thread SEPARATO significa che
+non si bloccano a vicenda. Thread_A aspetta il numero del client A, mentre
+accept() aspetta il client B.
+
+
+================================================================================
+PARTE 4: SOCKET, BUFFEREDREADER, PRINTWRITER - CANALI DI COMUNICAZIONE
+================================================================================
+
+COS'È UNA SOCKET?
+Una Socket rappresenta una connessione TCP/IP tra server e client. È come
+un "canale telefonico" tra due computer.
+
+    Client                    Network                 Server
+    ┌──────┐                           ┌──────────┐
+    │      │ ────── Socket TCP ────── │          │
+    │      │ ← − ← − ← − ← − ← − ← − − │ Socket   │
+    │      │ − − → − − → − − → − − → ─ │          │
+    │      │                           │ Ascolto  │
+    └──────┘                           └──────────┘
+
+Ogni Socket ha DUE canali:
+- InputStream: dati IN ARRIVO dal client
+- OutputStream: dati IN PARTENZA verso il client
+
+
+COME FUNZIONA NEL TUO CODICE:
+
+1. SERVER CREA UNA SERVERSOCKET (ascoltatore):
+    ServerSocket ss = new ServerSocket(2000);
+   "Ascolto sulla porta 2000 in attesa di clienti"
+
+2. CLIENT SI CONNETTE:
+    Socket socket = new Socket("192.168.1.50", 2000);
+   "Mi voglio connettere al server sulla porta 2000"
+
+3. SERVER ACCETTA:
+    Socket s = ss.accept();
+   "Ho una nuova connessione! Eccomi una Socket per comunare con questo client"
+
+4. ENTRAMBI COMUNICANO:
+   - Server invia dati via out.println()
+   - Client riceve via in.readLine()
+   - Client invia dati via socket.println()
+   - Server riceve via in.readLine()
+
+
+BUFFEREDREADER - LETTURA:
+
+    BufferedReader in = new BufferedReader(
+        new InputStreamReader(socket.getInputStream())
+    );
+    
+    String line = in.readLine();
+
+Cosa accade:
+1. socket.getInputStream() ottiene il flusso grezzo di BYTE dal client
+2. InputStreamReader() lo converte in CARATTERI
+3. BufferedReader() raggruppa i caratteri in LINEE (fino a \n)
+4. readLine() legge una linea intera
+
+readLine() è BLOCCANTE: il server si ferma qui e aspetta che il client
+invii una linea. Quando il client invia (termina con Enter), readLine()
+restituisce la stringa.
+
+
+PRINTWRITER - SCRITTURA:
+
+    PrintWriter out = new PrintWriter(
+        socket.getOutputStream(), 
+        true  // auto-flush
+    );
+    
+    out.println("Ciao client!");
+
+Cosa accade:
+1. socket.getOutputStream() ottiene il flusso verso il client
+2. PrintWriter() raggruppa i dati in buffere per inviare
+3. true (auto-flush) significa "invia subito, non aspettare"
+4. println() invia la stringa e termina con newline
+
+Senza auto-flush, il messaggio rimarrebbe in buffer e non verrebbe inviato
+al client finché non chiudi lo stream.
+
+
+CHIUDERE ORDINATAMENTE:
+
+Quando chiudi, i dati in buffer vengono SVUOTATI prima di chiudere:
+    out.close();  // Invia ultimi dati + chiude
+    in.close();   // Chiude il canale di input
+    socket.close();  // Chiude la connessione
+
+
+================================================================================
+PARTE 5: CONVERSION DI TIPI - PERCHÉ Integer.parseInt()?
+================================================================================
+
+IL PROBLEMA:
+Quando il client invia il numero "42", viene ricevuto come STRINGA:
+    line = in.readLine();  // line = "42" (stringa, non numero)
+
+Ma tu hai bisogno di confrontare con un numero intero:
+    if(numero == n) {  // numero deve essere int, non String
+        out.println("Hai vinto!");
+    }
+
+Non puoi confrontare una stringa con un intero:
+    if("42" == 42) {  // ✗ SBAGLIATO - tipi diversi
+        // Questo NON funziona come atteso
+    }
+
+
+LA SOLUZIONE: Integer.parseInt()
+
+    int numero = Integer.parseInt(line);
+    // Converte "42" → 42
+
+COSA ACCADE:
+- Integer.parseInt() riceve la stringa "42"
+- La analizza carattere per carattere
+- Verifica che sia composta solo da cifre (0-9)
+- Se tutto è valido, restituisce il numero intero 42
+- Se non è valido (es. "abc"), lancia NumberFormatException
+
+ESEMPI:
+
+    ✓ Integer.parseInt("42") → 42
+    ✓ Integer.parseInt("0") → 0
+    ✓ Integer.parseInt("1000") → 1000
+    ✓ Integer.parseInt("-5") → -5
+    
+    ✗ Integer.parseInt("abc") → NumberFormatException
+    ✗ Integer.parseInt("12.5") → NumberFormatException
+    ✗ Integer.parseInt("") → NumberFormatException
+    ✗ Integer.parseInt(null) → NullPointerException
+
+
+QUINDI IL TRY-CATCH PER QUESTO:
+
+    try {
+        int numero = Integer.parseInt(line);
+        // Ora numero è un int valido
+    } catch (NumberFormatException e) {
+        // Il client ha inviato qualcosa che non è un numero
+        out.println("Errore! Inserisci un numero valido.");
+    }
+
+
+================================================================================
+PARTE 6: ERRORI CHE HAI COMMESSO - MENTRE SCOPRIVI QUESTI CONCETTI
+================================================================================
+
+
+================================================================================
+ERRORE 1: WHILE(b = false) INVECE DI WHILE(!b)
+
+
+================================================================================
+ERRORE 1: WHILE(b = false) INVECE DI WHILE(!b)
+================================================================================
+
+COSA HAI FATTO:
+Nel primo do-while per la scelta del range, avevi scritto:
+    while(b = false);
+
+PERCHÉ È SBAGLIATO:
+L'operatore singolo "=" è un ASSEGNAMENTO, non un confronto. Quindi il tuo
+codice stava facendo: "assegna false a b e poi controlla se è vero". Questo
+significa che ad ogni iterazione stavi resettando b a false e il ciclo non
+terminava MAI, creando un loop infinito.
+
+È come dire "mentre assegno false a b" invece di "mentre b è false".
+
+COME CORREGGERE:
+Usa uno dei due modi corretti:
+    while(!b);      // Riprova finché b è false (consigliato, più leggibile)
+    while(b == false);  // Riprova finché b è uguale a false (più esplicito)
+
+LEZIONE:
+Ricorda: un singolo "=" assegna un valore, doppio "==" confronta due valori.
+
+
+================================================================================
+ERRORE 2: CATCH ESTERNO CHE CATTURA IL TRY-CATCH DEL DO-WHILE
+================================================================================
+
+COSA HAI FATTO:
+Avevi un try-catch intorno al do-while, così:
+    try {
+        do {
+            // codice che potrebbe lanciare eccezioni
+        } while(condizone);
+    } catch (IOException e) {
+        // gestione errore
+    }
+
+PERCHÉ È SBAGLIATO:
+Quando il client inviava un input non numerico, Integer.parseInt() lanciava
+una NumberFormatException. Il catch esterno la catturava e il programma
+saltava fuori dal ciclo completamente, impedendo al client di riprovare.
+
+Inoltre, se hai un ciclo che vuole RIPETERE comportamenti, il try-catch deve
+stare DENTRO il ciclo per permettere di gestire l'errore e continuare a
+iterare.
+
+COME CORREGGERE:
+Sposta il try-catch DENTRO il do-while:
+    do {
+        try {
+            // codice
+        } catch (NumberFormatException e) {
+            // gestisci errore, poi il ciclo riprova
+        }
+    } while(!condizione);
+
+In questo modo ogni iterazione ha il suo try-catch e gli errori vengono
+gestiti localmente.
+
+LEZIONE:
+Se vuoi che un ciclo RIPROVI dopo un errore, il try-catch deve stare
+all'interno del ciclo, non fuori.
+
+
+================================================================================
+ERRORE 3: FINALLY DENTRO IL DO-WHILE (CHIUSURA PREMATURA)
+================================================================================
+
+COSA HAI FATTO:
+Inizialmente avevi la struttura così:
+    do {
+        try {
+            // logica del gioco
+        } catch (...) { }
+    } while(!condizione);
+    finally {
+        // chiude risorse
+    }
+
+Oppure peggio ancora:
+    try {
+        do {
+            // logica del gioco
+        } while(!condizione);
+    } catch (...) { }
+    finally {
+        // chiude risorse
+    }
+
+PERCHÉ È SBAGLIATO:
+Se il finally (o il try-catch di chiusura) si trova DENTRO il do-while e
+si esegue ad ogni iterazione, allora la Socket si chiude dopo il primo
+tentativo fallito del client. Le iterazioni successive del ciclo non potranno
+più comunicare perché la connessione è già chiusa.
+
+È come dire: "Se il cliente sbaglia, chiudo il negozio completamente"
+invece di "Se il cliente sbaglia, gli dico di riprovare".
+
+COME CORREGGERE:
+Separa il ciclo dal try-catch di chiusura:
+    do {
+        try {
+            // logica del gioco
+        } catch (...) { }
+    } while(!condizione);
+    
+    // FUORI dal ciclo, try-catch SEPARATO
+    try {
+        // chiude risorse
+    } catch (IOException e) { }
+
+Il try-catch di chiusura deve stare DOPO il ciclo, non dentro.
+
+LEZIONE:
+Il ciclo è per ripetere un comportamento, il finally è per pulire le risorse
+una sola volta alla fine. Non mescolarli.
+
+
+================================================================================
+ERRORE 4: NON ASSEGNARE b = false QUANDO INUTILE
+================================================================================
+
+COSA HAI FATTO:
+In tutti i catch avevi:
+    catch (NumberFormatException e) {
+        out.println("Errore! ...");
+        b = false;  // ← Inutile, era già false
+    }
+
+PERCHÉ È SBAGLIATO CONCETTUALMENTE:
+Dal punto di vista logico non è "sbagliato" perché il comportamento è
+corretto. Ma è RIDONDANTE. Stai assegnando a una variabile lo stesso valore
+che ha già. È codice morto che complica la lettura.
+
+Se b inizializza a false e non la cambii quando c'è un errore, rimane false
+comunque. Scriverlo esplicitamente è confuso: sembra suggerire che stai
+cambiando lo stato, ma non lo stai facendo.
+
+COME CORREGGERE:
+Togli gli assegnamenti ridondanti:
+    catch (NumberFormatException e) {
+        out.println("Errore! ...");
+        // NON aggiungere b = false perché è già false
+    }
+
+LEZIONE:
+Scrivi solo le assegnazioni che CAMBIANO lo stato. Se il valore rimane lo
+stesso, non scrivere nulla. Il codice diventa più leggibile e è evidente
+dove effettivamente cambiano le cose.
+
+
+================================================================================
+ERRORE 5: MESCOLARE LOGICA DI CICLO CON LOGICA DI CLEANUP
+================================================================================
+
+COSA HAI FATTO:
+Inizialmente stavi pensando di fare tutto in un unico try-catch-finally grande:
+    try {
+        do {
+            // scelta del range
+        } while(!b);
+        // generare numero
+        do {
+            // scelta del numero
+        } while(!numeroValido);
+    } catch (...) { }
+    finally {
+        // chiudere tutto
+    }
+
+PERCHÉ È SBAGLIATO:
+Se metti TUTTO dentro un unico try-catch grande e il finally si esegue alla fine,
+non hai flexibility nel decidere cosa fare tra i due cicli. Inoltre, se vuoi
+gestire errori diversi in modi diversi nei due cicli, non puoi farlo efficacemente.
+
+È come dire: "O tutto va bene o muore tutto" invece di "Ogni parte ha le sue
+responsabilità".
+
+COME CORREGGERE:
+Separa le responsabilità:
+    // ===== CICLO 1: Scelta del range =====
+    do {
+        try { /* scelta range */ } 
+        catch (...) { }
+    } while(!b);
+    
+    // ===== CICLO 2: Scelta del numero =====
+    do {
+        try { /* scelta numero */ } 
+        catch (...) { }
+    } while(!numeroValido);
+    
+    // ===== CLEANUP: Chiusura risorse =====
+    try {
+        // chiude socket, stream, ecc
+    } catch (IOException e) { }
+
+Ogni sezione ha un try-catch specifico per gli errori che potrebbero occorrere.
+
+LEZIONE:
+In programmazione, il principio "Single Responsibility" dice che ogni blocco
+di codice deve avere UNA sola responsabilità. Non mescolare cicli con cleanup.
+
+
+================================================================================
+ERRORE 6: ASSEGNARE b = true ANCHE QUANDO C'È UN ERRORE CRITICO
+================================================================================
+
+COSA HAI FATTO:
+Nel catch di IOException, avevi:
+    catch (IOException e) {
+        // log errore
+        numeroValido = true;  // Esce dal ciclo
+    }
+
+PERCHÉ POTREBBE ESSERE CONFUSO:
+A prima vista sembra strano: "C'è un errore, ma imposto numeroValido a true?"
+Sembra contradditorio. La logica è corretta (esce dal ciclo quando c'è un
+errore critico), ma il nome della variabile rende il codice confuso.
+
+COME CHIARIRE:
+Il codice è effettivamente corretto. L'importante è capire LA LOGICA:
+- numeroValido = true significa "ho finito il ciclo" (sia per successo che per
+  errore critico)
+- numeroValido = false significa "ripeti il ciclo" (input invalido)
+
+Se vuoi renderlo più chiaro, puoi usare un nome più esplicito:
+    boolean continua = true;  // continua finché è true
+    ...
+    } catch (IOException e) {
+        continua = false;  // Errore critico, non continuare
+    }
+    while(continua);
+
+O puoi usare break:
+    } catch (IOException e) {
+        break;  // Esce dal ciclo immediatamente
+    }
+    while(!numeroValido);
+
+LEZIONE:
+I nomi delle variabili sono importanti. Assicurati che il nome rifletta
+davvero cosa rappresenta nel tuo codice.
+
+
+================================================================================
+ERRORE 7: MANCANZA DI VALIDAZIONE PER NUMERI FUORI RANGE
+================================================================================
+
+COSA HAI FATTO:
+Accettavi QUALSIASI numero intero come scelta del range:
+    int numero = Integer.parseInt(line);
+    if(numero == 1) { ... }
+    else if(numero == 2) { ... }
+    else if(numero == 3) { ... }
+    else { // scelta non valida }
+
+PERCHÉ NON È PROPRIAMENTE SBAGLIATO, MA È INCOMPLETO:
+Tecnicamente il codice funziona perché gestisci il caso "else". Ma cosa
+succede se il client inserisce 1000 o numeri negativi? Vengono rifiutati,
+va bene.
+
+Però il messaggio "Scelta non valida" potrebbe essere più specifico. Ad esempio,
+potrebbe dire "Scegli tra 1, 2 e 3".
+
+COME MIGLIORARE (Opzionale):
+    else {
+        out.println("Scelta non valida! Puoi scegliere solo 1, 2 o 3.");
+    }
+
+Questo rende più chiaro cosa il client dovrebbe fare.
+
+LEZIONE:
+I messaggi di errore dovrebbero essere specifici e guidare l'utente verso
+la soluzione corretta.
+
+
+================================================================================
+RIASSUNTO DEGLI ERRORI PRINCIPALI
+================================================================================
+
+1. Usare "=" invece di "==" per i confronti → SBAGLIATO
+2. Mettere il try-catch FUORI dal ciclo che vuole ripetere → SBAGLIATO
+3. Mettere il finally DENTRO il ciclo → SBAGLIATO
+4. Assegnare valori ridondanti che non cambiano lo stato → POCO PULITO
+5. Mescolare cicli con cleanup → POCO ORGANIZZATO
+6. Usare nomi di variabili confusi → POCO CHIARO
+7. Messaggi di errore non specifici → POCO UTILE
+
+REGOLE D'ORO:
+✓ I cicli (do-while) servono per RIPETERE → try-catch deve stare dentro
+✓ Il try-catch di cleanup serve per pulire UNA SOLA VOLTA → deve stare fuori
+✓ Scrivi solo codice che ha senso logico → niente assegnamenti ridondanti
+✓ Usa nomi di variabili che rispecchiano il loro significato
+✓ Separa le responsabilità → ogni blocco ha un compito
+
+================================================================================
