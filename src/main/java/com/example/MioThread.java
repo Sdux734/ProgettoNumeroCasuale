@@ -8,33 +8,32 @@ import java.net.Socket;
 import java.util.Random;
 import java.util.Scanner;
 
-public class MioThread extends Thread{
+public class MioThread extends Thread{  //estensione della classe Thread
 
-    private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
+    private Socket socket;  //dichiarazione della socket
+    private BufferedReader in;  //dichiarazione del buffer di input
+    private PrintWriter out;    //dichiarazione del buffer di output
     
-    public MioThread(Socket s) throws IOException {
-        socket = s;
+    public MioThread(Socket s) throws IOException { //costruttore della classe
         
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        out = new PrintWriter(socket.getOutputStream(), true);
+        socket = s; //inizializzazione della socket
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));    //inizializzazione del buffer di input
+        out = new PrintWriter(socket.getOutputStream(), true);  //inizializzazione del buffer di output
     }
 
-    @Override
-    public void run() {
+    @Override   //sovrascrittura del metodo run
+    public void run() { //metodo run del thread
         
         Scanner scanner = new Scanner(System.in);   
 
         System.out.println("Client connesso!");
-
         out.println("Scegli un numero tra 0-100!");
 
-        Random rand = new Random();
+        Random rand = new Random(); //creazione dell'oggetto Random
         int n = rand.nextInt(101); // da 0 a 100
         System.out.println(n);
 
-        String line = "";
+        String line = "";   
         try {
             line = in.readLine();
         } catch (IOException e) {
