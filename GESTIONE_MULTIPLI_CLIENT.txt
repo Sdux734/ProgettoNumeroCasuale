@@ -1,0 +1,360 @@
+================================================================================
+GESTIONE DI MULTIPLI CLIENT - DOCUMENTAZIONE COMPLETA
+================================================================================
+
+DOMANDA: "Se dovessi gestire la connessione di più di un client come potrei fare?"
+
+================================================================================
+SOLUZIONE 1: LOOP INFINITO CON ACCEPT() - SOLUZIONE PIÙ SEMPLICE
+================================================================================
+
+Modificare Main.java così:
+
+    package com.example;
+    
+    import java.io.IOException;
+    import java.net.ServerSocket;
+    import java.net.Socket;
+    
+    public class Main {
+        public static void main(String[] args) throws IOException {
+            ServerSocket ss = new ServerSocket(2000);
+            
+            System.out.println("Server in ascolto sulla porta 2000...");
+            
+            // Loop infinito per accettare più client
+            while(true) {
+                Socket s = ss.accept(); // Attende un client
+                System.out.println("Nuovo client connesso!");
+                
+                MioThread m = new MioThread(s);
+                m.start(); // Avvia il thread - ogni client ha il suo thread
+            }
+        }
+    }
+
+COME FUNZIONA:
+- Ogni volta che un client si connette, viene creato un nuovo thread MioThread
+- I thread paralleli permettono di gestire più client contemporaneamente
+- Il loop continua ad accettare nuovi client indefinitamente
+
+
+================================================================================
+SOLUZIONE 2: THREADPOOL CON EXECUTORSERVICE - PIÙ EFFICIENTE
+================================================================================
+
+Per applicazioni con molti client:
+
+    package com.example;
+    
+    import java.io.IOException;
+    import java.net.ServerSocket;
+    import java.net.Socket;
+    import java.util.concurrent.ExecutorService;
+    import java.util.concurrent.Executors;
+    
+    public class Main {
+        public static void main(String[] args) throws IOException {
+            ServerSocket ss = new ServerSocket(2000);
+            ExecutorService executor = Executors.newFixedThreadPool(10); // Max 10 client
+            
+            System.out.println("Server in ascolto sulla porta 2000...");
+            
+            while(true) {
+                Socket s = ss.accept();
+                System.out.println("Nuovo client connesso!");
+                
+                executor.execute(new MioThread(s)); // Assegna al pool di thread
+            }
+        }
+    }
+
+VANTAGGI: Limita il numero massimo di thread attivi, più efficiente con molti client.
+
+
+================================================================================
+SOLUZIONE 3: CHIUSURA CORRETTA DELLE RISORSE IN MIOTHREAD
+================================================================================
+
+Aggiungere try-finally per garantire la chiusura delle connessioni:
+
+    @Override
+    public void run() {
+        Scanner scanner = new Scanner(System.in);   
+        System.out.println("Client connesso!");
+        out.println("Scegli un numero tra 0-100!");
+
+        Random rand = new Random();
+        int n = rand.nextInt(101);
+        System.out.println(n);
+
+        String line = "";   
+        try {
+            line = in.readLine();
+            int numero = Integer.parseInt(line);
+
+            if(numero == n) {
+                out.println("Hai vinto!");
+            } else {
+                out.println("Hai perso!");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                scanner.close();
+                in.close();
+                out.close();
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+IMPORTANTE: Il finally garantisce che le risorse vengano liberate anche in caso di errori.
+
+
+================================================================================
+SPIEGAZIONE DETTAGLIATA DEL LOOP (SOLUZIONE 1)
+================================================================================
+
+Analizzando il loop:
+
+    while(true) {
+        Socket s = ss.accept();           // ← PASSO 1
+        System.out.println("Nuovo client connesso!");
+        
+        MioThread m = new MioThread(s);   // ← PASSO 2
+        m.start();                        // ← PASSO 3
+    }
+
+
+PASSO 1: ss.accept()
+-----------
+• accept() è un metodo BLOCCANTE (blocking)
+• Il server si ferma qui e attende che un client si connetta
+• Quando un client arriva, crea una nuova Socket e la assegna a s
+• Poi il loop prosegue
+
+Timeline esempio:
+    Istante 0s: accept() → Server in attesa...
+    Istante 5s: Cliente A si connette → accept() restituisce Socket_A
+    Istante 5.1s: Esegue println() e crea thread
+    Istante 5.2s: m.start() - avvia il thread
+    Istante 5.3s: Torna al WHILE e richiama accept()
+    Istante 8s: Cliente B si connette → accept() restituisce Socket_B
+                 (Nel frattempo Cliente A sta ancora giocando nel suo thread!)
+
+
+PASSO 2: Creazione del Thread
+-----------
+• Crea un nuovo oggetto thread passandogli la Socket del client
+• Questo thread sarà dedicato SOLO a questo client
+• La Socket rimane "legata" a quel thread specifico
+
+
+PASSO 3: Avvio del Thread
+-----------
+• Avvia il thread in background
+• NON è bloccante: il thread comincia a girare separatamente
+• Il loop continua immediatamente a eseguire il while
+
+
+VISUALIZZAZIONE TEMPORALE CON PIÙ CLIENT
+-----------
+TEMPO     MAIN (accept loop)           THREAD CLIENT_A          THREAD CLIENT_B
+────────────────────────────────────────────────────────────────────────────
+t=0s      accept() ← BLOCCO
+t=1s      ↓ (in attesa)
+t=2s      ↓ (in attesa)
+t=3s      Client A arriva! ✓
+          Crea Thread_A ✓
+          m.start() ✓
+          accept() ← BLOCCO                Client_A partito!
+t=4s      ↓ (in attesa)                    Aspetta numero...
+t=5s      ↓ (in attesa)                    Riceve numero
+t=6s      Client B arriva! ✓               Calcola risultato
+          Crea Thread_B ✓                  Invia risposta
+          m.start() ✓                      ✓ FINITO
+          accept() ← BLOCCO                        Client_B partito!
+t=7s      ↓ (in attesa)                           Aspetta numero...
+t=8s      ↓ (in attesa)                           Riceve numero
+                                                   Invia risposta
+
+
+DIFFERENZA: CON vs SENZA LOOP
+-----------
+❌ SENZA loop (come era prima):
+    ServerSocket ss = new ServerSocket(2000);
+    Socket s = ss.accept();      // Accetta 1 client
+    MioThread m = new MioThread(s);
+    m.start();
+    // ← FINE PROGRAMMA! Il server muore!
+
+• Accetta solo 1 client
+• Poi termina tutto
+• Client successivi ricevono "Connessione rifiutata"
+
+✅ CON loop (Soluzione 1):
+    ServerSocket ss = new ServerSocket(2000);
+    while(true) {                // LOOP INFINITO
+        Socket s = ss.accept();  // Accetta client 1, 2, 3, 4...
+        MioThread m = new MioThread(s);
+        m.start();
+        // Torna al while ← RE-ESEGUE accept()
+    }
+
+• Accetta infiniti client nel tempo
+• Ogni uno ottiene il suo thread indipendente
+• Il server non muore mai
+
+
+================================================================================
+PERCHÉ MULTIPLI CLIENT SU UNA SOLA PORTA NON CREA ERRORI?
+================================================================================
+
+IDEA SBAGLIATA:
+"Se due client usano la stessa porta 2000, non dovrebbero cozzare?"
+
+LA REALTÀ:
+La porta 2000 è solo il "numero civico" dove il server ascolta. 
+Non è il canale di comunicazione vero!
+
+
+ANALOGIA CON UN UFFICIO POSTALE
+-----------
+    ┌─────────────────────────────────────┐
+    │     UFFICIO POSTALE (Porta 2000)    │
+    │                                     │
+    │  📬 SPORTELLO DI RICEZIONE          │
+    │     (ServerSocket.accept())         │
+    │                                     │
+    │  ✓ Cliente A entra → Sportello 1    │
+    │  ✓ Cliente B entra → Sportello 2    │
+    │  ✓ Cliente C entra → Sportello 3    │
+    │                                     │
+    │  (Tutti entrano per la porta 2000)  │
+    │  (Ma ogni uno ha il suo sportello)  │
+    └─────────────────────────────────────┘
+
+La porta 2000 è l'ingresso unico, ma ogni client ottiene una connessione indipendente.
+
+
+I 4 ELEMENTI DI UNA CONNESSIONE TCP
+-----------
+Ogni connessione TCP è identificata da 4 parametri (tupla):
+
+    (IP_Server, Porta_Server, IP_Client, Porta_Client)
+
+Esempio con 2 client reali:
+
+CLIENT A (IP: 192.168.1.100, Porta: 54321)
+    ↓
+    Connessione A: (192.168.1.50, 2000, 192.168.1.100, 54321)
+    ↓
+SERVER (IP: 192.168.1.50, Porta: 2000)
+
+CLIENT B (IP: 192.168.1.101, Porta: 54322)
+    ↓
+    Connessione B: (192.168.1.50, 2000, 192.168.1.101, 54322)
+    ↓
+SERVER (IP: 192.168.1.50, Porta: 2000)
+
+ANCHE SE ENTRAMBI USANO PORTA SERVER 2000, SONO CONNESSIONI DIVERSE PERCHÉ:
+- IP_Client è diverso (100 vs 101)
+- Porta_Client è diversa (54321 vs 54322)
+
+Il sistema operativo distingue automaticamente!
+
+
+COME FUNZIONA IN JAVA
+-----------
+    ServerSocket ss = new ServerSocket(2000);  // ← Una sola ServerSocket sulla porta 2000
+    
+    // Client A si connette
+    Socket s1 = ss.accept();  // ← Restituisce Socket(IP_A, porta_A)
+    
+    // Client B si connette (mentre A è ancora connesso)
+    Socket s2 = ss.accept();  // ← Restituisce Socket(IP_B, porta_B)
+                              // ← DIVERSA da s1!
+    
+    // Client C si connette
+    Socket s3 = ss.accept();  // ← Restituisce Socket(IP_C, porta_C)
+                              // ← DIVERSA sia da s1 che da s2!
+
+Ogni Socket è UNICA anche se il server ascolta su una sola porta.
+
+
+DIAGRAMMA DEL FLOW
+-----------
+    ┌─────────────────────────────────────────────┐
+    │  ServerSocket ss = new ServerSocket(2000)   │
+    │  ↑                                           │
+    │  (ascolta sulla porta 2000)                  │
+    │                                              │
+    │  while(true) {                              │
+    │      Socket s = ss.accept();  ← ACCETTA     │
+    │      ↓                                       │
+    │    Ogni accept() crea una NUOVA Socket      │
+    │    con combinazione IP/porta unica          │
+    │                                              │
+    │      MioThread m = new MioThread(s);        │
+    │      m.start();  ← Thread indipendente      │
+    │  }                                          │
+    └─────────────────────────────────────────────┘
+    
+        ↓ ss.accept() ← BLOCCANTE
+        │
+        ├─ Cliente A si connette (192.168.1.100:54321)
+        │  → Crea Socket s1
+        │  → Crea Thread_A con s1
+        │  → Thread_A legge/scrive su s1
+        │
+        ├─ Cliente B si connette (192.168.1.101:54322)
+        │  → Crea Socket s2
+        │  → Crea Thread_B con s2
+        │  → Thread_B legge/scrive su s2
+        │  (Nel frattempo Thread_A continua indipendente)
+        │
+        └─ Cliente C si connette (192.168.1.102:54323)
+           → Crea Socket s3
+           → Crea Thread_C con s3
+           → Thread_C legge/scrive su s3
+
+
+COSA POTREBBE DARE ERRORE?
+-----------
+ERRORE: Aprire 2 ServerSocket sulla stessa porta:
+    ServerSocket ss1 = new ServerSocket(2000);  // ✓ OK
+    ServerSocket ss2 = new ServerSocket(2000);  // ✗ ERRORE!
+    // "Address already in use"
+
+Ma con 1 ServerSocket e multiple Socket: ✅ PERFETTAMENTE OK!
+
+
+TABELLA RIASSUNTIVA
+-----------
+Elemento                   | Quanti?         | Effetto
+---------------------------|-----------------|----------------------------------------
+ServerSocket(2000)         | 1 sola          | Ascolta in un'unica porta
+Socket per client          | N illimitati    | Ogni client ha la sua connessione unica
+Thread per client          | N illimitati    | Ogni thread gestisce indipendentemente
+Porta server               | 1 sola          | Tanti client → stessa porta, diversi 
+                           |                 | IP/porta client
+
+LA MAGIA:
+Il sistema operativo e il protocollo TCP si incaricano di instradare correttamente 
+i dati verso la giusta Socket in base alla TUPLA COMPLETA 
+(IP_server, porta_server, IP_client, porta_client).
+
+
+================================================================================
+CONSIGLIO FINALE
+================================================================================
+
+✅ Usa la SOLUZIONE 1 se è la prima volta
+✅ Considera la SOLUZIONE 2 per applicazioni con molti client
+✅ Aggiungi sempre il try-finally per la chiusura delle risorse (SOLUZIONE 3)
+
+================================================================================
