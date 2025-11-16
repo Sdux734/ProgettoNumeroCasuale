@@ -121,3 +121,8 @@ public class MioThread extends Thread{  //estensione della classe Thread
 }
 
 
+
+// patch future sul codice:
+// aggiunta della partita infinita e del conattore di errori per la scelta del numero
+// aggiunta di una funzione per gli hint (numero finito)
+

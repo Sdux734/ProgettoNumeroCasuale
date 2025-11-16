@@ -227,7 +227,7 @@ ANALOGIA CON UN UFFICIO POSTALE
     ┌─────────────────────────────────────┐
     │     UFFICIO POSTALE (Porta 2000)    │
     │                                     │
-    │  📬 SPORTELLO DI RICEZIONE          │
+    │  📬 SPORTELLO DI RICEZIONE          |
     │     (ServerSocket.accept())         │
     │                                     │
     │  ✓ Cliente A entra → Sportello 1    │

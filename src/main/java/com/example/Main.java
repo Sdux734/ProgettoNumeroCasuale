@@ -6,7 +6,7 @@ import java.net.Socket;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        ServerSocket ss = new ServerSocket(2000);
+        ServerSocket ss = new ServerSocket(2000);   //non verra mai chiuso peché il server deve essere sempre attivo
         
         System.out.println("Server in ascolto sulla porta 2000...");
         
